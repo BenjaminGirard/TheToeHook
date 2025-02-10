@@ -1,8 +1,6 @@
-// components/MapComponent.tsx
-"use client";
-
-import React, { useState, useCallback, useRef } from "react";
-import { GoogleMap, LoadScript, Marker } from "@react-google-maps/api";
+import React, { useState, useCallback, useRef, useEffect } from "react";
+import { GoogleMap, LoadScript } from "@react-google-maps/api";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 export type OSMSpot = {
   id: number;
@@ -21,17 +19,17 @@ const defaultCenter = {
   lng: -100.0,
 };
 
-const marginDegrees = 0.05; // Extend the bounds by 0.05 degrees on each side
+const marginDegrees = 0.05;
 
 const MapComponent: React.FC = () => {
   const [spots, setSpots] = useState<OSMSpot[]>([]);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const markerClusterRef = useRef<MarkerClusterer | null>(null);
 
   const fetchSpots = useCallback(async (bounds: google.maps.LatLngBounds) => {
     const ne = bounds.getNorthEast();
     const sw = bounds.getSouthWest();
 
-    // Extend bounds by adding a margin
     const extendedBounds = {
       north: ne.lat() + marginDegrees,
       east: ne.lng() + marginDegrees,
@@ -63,23 +61,48 @@ const MapComponent: React.FC = () => {
     }
   };
 
+  const initializeMarkerClusterer = () => {
+    if (mapRef.current && !markerClusterRef.current) {
+      markerClusterRef.current = new MarkerClusterer({ map: mapRef.current });
+    }
+  };
+
+  const updateMarkers = async () => {
+    if (markerClusterRef.current) {
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
+      const markers = spots.map((spot) => {
+        const marker = new AdvancedMarkerElement({
+          position: { lat: spot.lat, lng: spot.lon },
+          title: spot.tags.name || "",
+        });
+        return marker;
+      });
+      markerClusterRef.current.clearMarkers();
+      markerClusterRef.current.addMarkers(markers);
+    }
+  };
+
+  useEffect(() => {
+    updateMarkers();
+  }, [spots]);
+
+  useEffect(() => {
+    console.log(process.env.GOOGLE_MAP_ID);
+  }, []);
+
   return (
     <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={defaultCenter}
         zoom={5}
-        onLoad={(map) => (mapRef.current = map)}
+        options={{ mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID }}
+        onLoad={(map) => {
+          mapRef.current = map;
+          initializeMarkerClusterer();
+        }}
         onIdle={onIdle}
-      >
-        {spots.map((spot) => (
-          <Marker
-            key={spot.id}
-            position={{ lat: spot.lat, lng: spot.lon }}
-            title={spot.tags.name || ""}
-          />
-        ))}
-      </GoogleMap>
+      />
     </LoadScript>
   );
 };
