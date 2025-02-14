@@ -87,7 +87,7 @@ const MapComponent: React.FC = () => {
   }, [spots]);
 
   useEffect(() => {
-    console.log(process.env.GOOGLE_MAP_ID);
+    console.log(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
   }, []);
 
   return (
@@ -96,7 +96,10 @@ const MapComponent: React.FC = () => {
         mapContainerStyle={containerStyle}
         center={defaultCenter}
         zoom={5}
-        options={{ mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID }}
+        options={{
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "",
+          disableDefaultUI: true, // Optional: removes default UI elements for cleaner look
+        }}
         onLoad={(map) => {
           mapRef.current = map;
           initializeMarkerClusterer();
