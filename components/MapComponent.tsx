@@ -11,17 +11,19 @@ export type OSMSpot = {
 
 const containerStyle = {
   width: "100%",
-  height: "600px",
+  height: "100%",
 };
 
 const defaultCenter = {
-  lat: 40.0,
-  lng: -100.0,
+  lat: 48.400002,
+  lng: 2.7,
 };
 
-const marginDegrees = 0.05;
+interface MapComponentProps {
+  onSpotsUpdate?: (spots: OSMSpot[]) => void;
+}
 
-const MapComponent: React.FC = () => {
+const MapComponent: React.FC<MapComponentProps> = ({ onSpotsUpdate }) => {
   const [spots, setSpots] = useState<OSMSpot[]>([]);
   const mapRef = useRef<google.maps.Map | null>(null);
   const markerClusterRef = useRef<MarkerClusterer | null>(null);
@@ -31,10 +33,10 @@ const MapComponent: React.FC = () => {
     const sw = bounds.getSouthWest();
 
     const extendedBounds = {
-      north: ne.lat() + marginDegrees,
-      east: ne.lng() + marginDegrees,
-      south: sw.lat() - marginDegrees,
-      west: sw.lng() - marginDegrees,
+      north: ne.lat(),
+      east: ne.lng(),
+      south: sw.lat(),
+      west: sw.lng(),
     };
 
     const queryString = `?north=${extendedBounds.north}&east=${extendedBounds.east}&south=${extendedBounds.south}&west=${extendedBounds.west}`;
@@ -68,17 +70,31 @@ const MapComponent: React.FC = () => {
   };
 
   const updateMarkers = async () => {
-    if (markerClusterRef.current) {
+    if (!markerClusterRef.current) return;
+
+    try {
       const { AdvancedMarkerElement } = await google.maps.importLibrary("marker");
-      const markers = spots.map((spot) => {
-        const marker = new AdvancedMarkerElement({
+      
+      // Filter out invalid spots first
+      const validSpots = spots.filter((spot): spot is OSMSpot => 
+        spot !== null && 
+        typeof spot.lat === 'number' && 
+        typeof spot.lon === 'number' &&
+        !isNaN(spot.lat) && 
+        !isNaN(spot.lon)
+      );
+
+      const markers = validSpots.map((spot) => {
+        return new AdvancedMarkerElement({
           position: { lat: spot.lat, lng: spot.lon },
-          title: spot.tags.name || "",
+          title: spot.tags?.name || "",
         });
-        return marker;
       });
+
       markerClusterRef.current.clearMarkers();
       markerClusterRef.current.addMarkers(markers);
+    } catch (error) {
+      console.error('Error updating markers:', error);
     }
   };
 
@@ -87,15 +103,17 @@ const MapComponent: React.FC = () => {
   }, [spots]);
 
   useEffect(() => {
-    console.log(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY);
-  }, []);
+    if (onSpotsUpdate) {
+      onSpotsUpdate(spots);
+    }
+  }, [spots, onSpotsUpdate]);
 
   return (
     <LoadScript googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""}>
       <GoogleMap
         mapContainerStyle={containerStyle}
         center={defaultCenter}
-        zoom={5}
+        zoom={11}
         options={{
           mapId: process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || "",
           disableDefaultUI: true, // Optional: removes default UI elements for cleaner look
